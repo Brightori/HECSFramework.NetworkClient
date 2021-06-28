@@ -181,7 +181,7 @@ namespace HECSFramework.Network
             }
         }
 
-        public void GlobalReact(SyncServerComponentsCommand command)
+        public void CommandGlobalReact(SyncServerComponentsCommand command)
         {
             foreach (var dataContainer in command.Components)
             {

@@ -6,7 +6,6 @@ using HECSFramework.Network;
 using HECSFramework.Unity;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace Systems
@@ -21,13 +20,12 @@ namespace Systems
         private List<INetworkComponent> networkComponents = new List<INetworkComponent>(32);
 
         [Required] private ConnectionsHolderComponent connectionHolderComponent;
+        
         private NetworkClientTagComponent networkClient;
         private ResolversMap resolversMap = new ResolversMap();
         private ConcurrencyList<IEntity> currentNetworkEntities = EntityManager.Filter(HMasks.GetMask<ReplicatedNetworkEntityComponent>());
 
         private HECSMask networkEntityTag = HMasks.GetMask<NetworkEntityTagComponent>();
-        private HECSMask replicatedEntity = HMasks.GetMask<ReplicatedNetworkEntityComponent>();
-
         private IDataSenderSystem dataSenderSystem;
 
         public Guid ListenerGuid => SystemGuid;
@@ -62,7 +60,7 @@ namespace Systems
                     return;
             }
 
-            dataSenderSystem.SendCommand(new SyncClientNetworkCommand { ClientGuid = networkClient.Owner.GUID, World = 0 });
+            dataSenderSystem.SendCommandToServer(new SyncClientNetworkCommand { ClientGuid = networkClient.Owner.GUID, World = 0 });
         }
 
         public void ComponentReact(IComponent component, bool isAdded)
@@ -92,7 +90,7 @@ namespace Systems
                 if (!n.Owner.IsAlive)
                     continue;
             
-                dataSenderSystem.SyncSendComponent(n);
+                dataSenderSystem.SendSyncComponentToServer(n);
                 n.IsDirty = false;
             }
         }
@@ -122,13 +120,13 @@ namespace Systems
                 {
                     if (command.IsAdded)
                     {
-                        if (entity.ContainsMask(id))
+                        if (entity.ContainsMask(ref mask.ComponentsMask))
                             resolversMap.ProcessResolverContainer(ref command.component, ref entity);
                         else
                             entity.AddHecsComponent(component);
                     }
                     else
-                        entity.RemoveHecsComponent(id);
+                        entity.RemoveHecsComponent(mask.ComponentsMask);
                 }
                 Debug.Log($"получили компонент  c сервера {mask.ComponentName} для ентити {entity.GUID} {entity.ID}");
             }
@@ -154,7 +152,7 @@ namespace Systems
                 if (currentNetworkEntities.Any(x => x.GUID == guid))
                     continue;
 
-                Owner.GetNetworkConnectionHolderComponent().MessageSender.SendCommand(new RequestEntityFromServerNetworkCommand { ClientID = networkClient.Owner.EntityGuid, NeededEntity = guid });
+                dataSenderSystem.SendCommandToServer(new RequestEntityFromServerNetworkCommand { ClientID = networkClient.ClientGuid, NeededEntity = guid });
             }
         }
     }
