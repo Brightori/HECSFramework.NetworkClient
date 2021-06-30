@@ -1,6 +1,7 @@
 ﻿using Commands;
 using Components;
 using HECSFramework.Core;
+using HECSFramework.Network;
 using HECSFramework.Unity;
 using HECSServer.Core;
 using LiteNetLib;
@@ -9,10 +10,9 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using Systems;
 using UnityEngine;
 
-namespace HECSFramework.Network
+namespace Systems
 {
     [Serializable, BluePrint]
     public class NetworkSystem : BaseSystem, INetworkSystem, ICustomUpdatable,
@@ -162,7 +162,7 @@ namespace HECSFramework.Network
                         Client = netID.GUID,
                     };
 
-                    dataSenderSystem.SendCommand(peer,Guid.Empty, connect);
+                    dataSenderSystem.SendCommand(peer, Guid.Empty, connect);
                     break;
                 case NetWorkSystemState.Sync:
                     if (peer.ConnectionState == ConnectionState.Disconnected)
@@ -199,7 +199,10 @@ namespace HECSFramework.Network
             }
         }
     }
+}
 
+namespace Systems
+{
     public interface INetworkSystem : ISystem
     {
         bool IsReady { get; }
