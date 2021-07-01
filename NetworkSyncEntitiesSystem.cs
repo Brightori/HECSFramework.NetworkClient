@@ -23,7 +23,7 @@ namespace Systems
         
         private NetworkClientTagComponent networkClient;
         private ResolversMap resolversMap = new ResolversMap();
-        private ConcurrencyList<IEntity> currentNetworkEntities = EntityManager.Filter(HMasks.GetMask<ReplicatedNetworkEntityComponent>());
+        private ConcurrencyList<IEntity> currentNetworkEntities;
 
         private HECSMask networkEntityTag = HMasks.GetMask<NetworkEntityTagComponent>();
         private IDataSenderSystem dataSenderSystem;
@@ -32,6 +32,7 @@ namespace Systems
 
         public override void InitSystem()
         {
+            currentNetworkEntities = EntityManager.Filter(HMasks.GetMask<ReplicatedNetworkEntityComponent>());
             connectionHolderComponent = Owner.GetHECSComponent<ConnectionsHolderComponent>();
 
             foreach (var e in EntityManager.Worlds[0].Entities)

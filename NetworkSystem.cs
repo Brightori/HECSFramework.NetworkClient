@@ -7,7 +7,7 @@ using HECSServer.Core;
 using LiteNetLib;
 using MessagePack;
 using System;
-using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using UnityEngine;
@@ -106,8 +106,11 @@ namespace Systems
 
         public void CommandGlobalReact(ConnectToServerCommand command)
         {
-            Start(Convert.ToInt32(command.LocalPort));
-            serverInfo = (command.Address, Convert.ToInt32(command.ServerPort), command.ServerKey);
+            var connectionsToServer = Owner.GetHECSComponent<ServerConnectionsComponent>();
+            var neededConnection = connectionsToServer.ServerConnectionBluePrints.First(x => x.IsActive);
+
+            Start(neededConnection.LocalPort);
+            serverInfo = (neededConnection.Address, Convert.ToInt32(neededConnection.Port), neededConnection.ServerKey);
             State = NetWorkSystemState.Connect;
         }
 
@@ -167,13 +170,9 @@ namespace Systems
                 case NetWorkSystemState.Sync:
                     if (peer.ConnectionState == ConnectionState.Disconnected)
                     {
-                        // Реконнект работал криво - вместо этого выводим уведомление и закрываем игру
-                        //State = NetWorkSystemState.Connect;
-
                         EntityManager.Command(new CloseConnectionCommand());
                         return;
                     }
-
                     syncSystem.SyncNetworkComponents();
                     break;
                 case NetWorkSystemState.Disconnect:
