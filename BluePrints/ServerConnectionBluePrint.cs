@@ -5,7 +5,7 @@ using UnityEngine;
 [InlineEditor]
 public class ServerConnectionBluePrint : ScriptableObject
 {
-    public bool IsActive;
+    public bool IsActive = true;
 
     [Space(20)]
     public string Address = "localhost";
