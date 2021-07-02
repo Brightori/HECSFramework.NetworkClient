@@ -6,12 +6,12 @@ namespace Systems
 {
     public partial class DataSenderSystem
     {
-        public void SendCommandToServer<T>(T networkCommand, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkCommand
+        public void SendCommandToServer<T>(T networkCommand, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkCommand, IData
         {
             SendCommand(connectionsHolder.serverPeer, SystemGuid, networkCommand);
         }
 
-        public void SendSyncComponentToServer<T>(T component, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkComponent
+        public void SendSyncComponentToServer<T>(T component, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkComponent 
         {
             var container = EntityManager.ResolversMap.GetComponentContainer(component);
             connectionsHolder.serverPeer.Send(PackResolverContainer(container), deliveryMethod);
@@ -20,7 +20,7 @@ namespace Systems
 
     public partial interface IDataSenderSystem : ISystem
     {
-        void SendCommandToServer<T>(T networkCommand, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkCommand;
+        void SendCommandToServer<T>(T networkCommand, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkCommand, IData;
         void SendSyncComponentToServer<T>(T component, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkComponent;
     }
 }
