@@ -4,34 +4,41 @@ using HECSFramework.Core;
 using HECSFramework.Unity;
 using HECSFramework.Unity.Helpers;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using UnityEngine;
 
 namespace Systems
 {
     [Serializable, BluePrint]
-    public class NetworkSpawnEntitiesSystem : BaseSystem, 
-        INetworkSpawnEntitiesSystem, IReactEntity,
+    public class NetworkSpawnEntitiesSystem : BaseSystem,
+        INetworkSpawnEntitiesSystem, IReactEntity, IAfterEntityInit,
         IReactGlobalCommand<RemoveEntityFromClientCommand>,
         IReactGlobalCommand<SpawnCompleteCommand>,
-        IReactGlobalCommand<SpawnEntityCommand>
+        IReactGlobalCommand<SpawnEntityCommand>,
+        IReactGlobalCommand<ClientConnectSuccessCommand>
     {
         public YieldInstruction Interval { get; } = new WaitForSeconds(2);
 
-        private ConcurrencyList<Guid> alrdyHaveThisEntities = new ConcurrencyList<Guid>();
+        private HashSet<Guid> alrdyHaveThisEntities = new HashSet<Guid>();
         private ConnectionsHolderComponent connectionsHolderComponent;
+        private IDataSenderSystem dataSenderSystem;
         private NetworkClientTagComponent networkClient;
+
+        private bool isConnected;
+
+        private HECSMask replicatedComponentMask = HMasks.GetMask<ReplicatedNetworkEntityComponent>();
 
         public override void InitSystem()
         {
-            var mask = HMasks.GetMask<NetworkClientTagComponent>();
-            if (EntityManager.TryGetEntityByComponents(out var networkClientEntity, ref mask))
-            {
-                networkClientEntity.TryGetHecsComponent(out networkClient);
-            }
-
+            Owner.TryGetHecsComponent(out networkClient);
             Owner.TryGetHecsComponent(out connectionsHolderComponent);
+        }
 
+        public void AfterEntityInit()
+        {
+            Owner.TryGetSystem(out dataSenderSystem);
         }
 
         public async void ProcessSpawnCommand(SpawnEntityCommand command)
@@ -39,22 +46,19 @@ namespace Systems
             if (command.IsNeedRecieveConfirm)
                 EntityManager.GetSingleSystem<DataSenderSystem>().SendCommand(Guid.Empty, new ConfirmRecieveCommand { Index = command.Index });
 
-            if (string.IsNullOrEmpty(command.ActorContainerID.ID))
-                return;
-
             if (alrdyHaveThisEntities.Contains(command.CharacterGuid))
                 return;
 
-            var actor = await command.Entity.GetActorFromResolver();
-            
+            var actor = await command.Entity.GetNetworkActorFromResolver();
+
             if (actor == null)
                 alrdyHaveThisEntities.Add(command.CharacterGuid);
             else
                 return;
-            
+
             actor.GetOrAddComponent<ReplicatedNetworkEntityComponent>();
             actor.Init();
-            
+
             //todo сюда дописать установку позиции и вращения, после того как будет понятно как разрулить трансформ компонент на сервере и клиенте
             //actor.GetHECSComponent<TransformComponent>().SetPosition()
         }
@@ -99,20 +103,65 @@ namespace Systems
 
             connectionsHolderComponent.SyncIndex = command.SyncIndex;
         }
-      
+
         public void CommandGlobalReact(SpawnEntityCommand command)
             => ProcessSpawnCommand(command);
 
         public void EntityReact(IEntity entity, bool isAdded)
         {
-            if (!isAdded)
+            if (isAdded)
+            {
+                if (entity.ContainsMask(ref HMasks.NetworkEntityTagComponent))
+                {
+                    if (isConnected)
+                    {
+                        dataSenderSystem.SendCommandToServer(new SpawnEntityCommand
+                        {
+                            CharacterGuid = entity.GUID,
+                            ClientGuid = networkClient.ClientGuid,
+                            Entity = new EntityResolver().GetEntityResolver(entity),
+                            Index = 0,
+                            IsNeedRecieveConfirm = false,
+                        });
+                    }
+                    else
+                    {
+                        alrdyHaveThisEntities.Add(entity.GUID);
+                    }
+                }
+            }
+            else
             {
                 alrdyHaveThisEntities.Remove(entity.GUID);
             }
         }
+
+        public void CommandGlobalReact(ClientConnectSuccessCommand command)
+        {
+            if (dataSenderSystem == null)
+            {
+                Owner.TryGetSystem(out dataSenderSystem);
+            }
+
+            foreach (var entityID in alrdyHaveThisEntities)
+            {
+                if (EntityManager.TryGetEntityByID(entityID, out var entity))
+                {
+                    if (entity.ContainsMask(ref replicatedComponentMask))
+                        continue;
+
+                    dataSenderSystem.SendCommandToServer(new SpawnEntityCommand
+                    {
+                        CharacterGuid = entity.GUID,
+                        ClientGuid = networkClient.ClientGuid,
+                        Entity = new EntityResolver().GetEntityResolver(entity),
+                    });
+                }
+            }
+        }
     }
 
-    public interface INetworkSpawnEntitiesSystem : ISystem 
+    public interface INetworkSpawnEntitiesSystem : ISystem
     {
     }
 }

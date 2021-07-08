@@ -14,7 +14,7 @@ using UnityEngine;
 namespace Systems
 {
     [Serializable, BluePrint]
-    public class NetworkSystem : BaseSystem, INetworkSystem, ICustomUpdatable,
+    public class NetworkSystem : BaseSystem, INetworkSystem, ICustomUpdatable, ILateStart,
         IReactGlobalCommand<ConnectToServerCommand>,
         IReactGlobalCommand<ClientConnectSuccessCommand>,
         IReactGlobalCommand<SyncServerComponentsCommand>
@@ -105,12 +105,6 @@ namespace Systems
 
         public void CommandGlobalReact(ConnectToServerCommand command)
         {
-            var connectionsToServer = Owner.GetHECSComponent<ServerConnectionsComponent>();
-            var neededConnection = connectionsToServer.ServerConnectionBluePrints.First(x => x.IsActive);
-
-            Start(neededConnection.LocalPort);
-            serverInfo = (neededConnection.Address, Convert.ToInt32(neededConnection.Port), neededConnection.ServerKey);
-            State = NetWorkSystemState.Connect;
         }
 
         private void ConnectingLoop()
@@ -195,6 +189,16 @@ namespace Systems
                     }
                 }
             }
+        }
+
+        public void LateStart()
+        {
+            var connectionsToServer = Owner.GetHECSComponent<ServerConnectionsComponent>();
+            var neededConnection = connectionsToServer.ServerConnectionBluePrints.First(x => x.IsActive);
+
+            Start(neededConnection.LocalPort);
+            serverInfo = (neededConnection.Address, Convert.ToInt32(neededConnection.Port), neededConnection.ServerKey);
+            State = NetWorkSystemState.Connect;
         }
     }
 }
