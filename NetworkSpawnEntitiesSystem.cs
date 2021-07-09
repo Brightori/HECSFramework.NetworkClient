@@ -150,12 +150,11 @@ namespace Systems
                     if (entity.ContainsMask(ref replicatedComponentMask))
                         continue;
 
-                    dataSenderSystem.SendCommandToServer(new SpawnEntityCommand
+                    dataSenderSystem.SendCommandToServer(new RegisterClientEntityOnServerCommand
                     {
-                        CharacterGuid = entity.GUID,
                         ClientGuid = networkClient.ClientGuid,
                         Entity = new EntityResolver().GetEntityResolver(entity),
-                    });
+                    }, LiteNetLib.DeliveryMethod.ReliableUnordered);
                 }
             }
         }

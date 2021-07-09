@@ -9,6 +9,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using UnityEditor.UIElements;
 using UnityEngine;
 
 namespace Systems
@@ -59,6 +60,10 @@ namespace Systems
         private void ListenerOnNetworkReceiveEvent(NetPeer peer, NetPacketReader netPacketReader, DeliveryMethod deliveryMethod)
         {
             var bytes = netPacketReader.GetRemainingBytes();
+
+            if (bytes.Length == 0)
+                return;
+
             var message = MessagePackSerializer.Deserialize<ResolverDataContainer>(bytes);
             dataProcessor.Process(message);
         }
@@ -117,7 +122,10 @@ namespace Systems
             Connect(serverInfo.address, serverInfo.port, serverInfo.key);
 
             if (peer != null && peer.ConnectionState == ConnectionState.Connected)
+            {
                 State = NetWorkSystemState.BeforeSync;
+                connectionHolderComponent.serverPeer = peer;
+            }
         }
 
         private void Connect(string host, int port, string serverKey)
@@ -138,7 +146,14 @@ namespace Systems
 
         public void UpdateCustom()
         {
-            client.PollEvents();
+            try
+            {
+                client.PollEvents();
+            }
+            catch(Exception ex)
+            {
+                var t = ex.ToString();
+            }
 
             switch (State)
             {
@@ -159,6 +174,7 @@ namespace Systems
                     };
 
                     dataSenderSystem.SendCommand(peer, Guid.Empty, connect);
+                    connectionHolderComponent.serverPeer = peer;
                     break;
                 case NetWorkSystemState.Sync:
                     if (peer.ConnectionState == ConnectionState.Disconnected)
