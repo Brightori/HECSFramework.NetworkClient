@@ -44,7 +44,7 @@ namespace Systems
         public async void ProcessSpawnCommand(SpawnEntityCommand command)
         {
             if (command.IsNeedRecieveConfirm)
-                EntityManager.GetSingleSystem<DataSenderSystem>().SendCommand(Guid.Empty, new ConfirmRecieveCommand { Index = command.Index });
+                EntityManager.GetSingleSystem<DataSenderSystem>().SendCommandToServer(new ConfirmRecieveCommand { Index = command.Index });
 
             if (alrdyHaveThisEntities.Contains(command.CharacterGuid))
                 return;
