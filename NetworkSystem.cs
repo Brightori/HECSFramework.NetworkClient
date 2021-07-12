@@ -146,14 +146,7 @@ namespace Systems
 
         public void UpdateCustom()
         {
-            try
-            {
-                client.PollEvents();
-            }
-            catch(Exception ex)
-            {
-                var t = ex.ToString();
-            }
+            client.PollEvents();
 
             switch (State)
             {

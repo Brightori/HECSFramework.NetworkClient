@@ -34,6 +34,7 @@ namespace Systems
         {
             currentNetworkEntities = EntityManager.Filter(HMasks.GetMask<ReplicatedNetworkEntityComponent>());
             connectionHolderComponent = Owner.GetHECSComponent<ConnectionsHolderComponent>();
+            networkClient = Owner.GetHECSComponent<NetworkClientTagComponent>();
 
             foreach (var e in EntityManager.Worlds[0].Entities)
             {
