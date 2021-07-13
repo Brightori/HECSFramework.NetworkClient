@@ -30,6 +30,7 @@ namespace Systems
         private bool isConnected;
 
         private HECSMask replicatedComponentMask = HMasks.GetMask<ReplicatedNetworkEntityComponent>();
+        private HECSMask networkEntityTagMask = HMasks.GetMask<NetworkEntityTagComponent>();
 
         public override void InitSystem()
         {
@@ -118,7 +119,7 @@ namespace Systems
         {
             if (isAdded)
             {
-                if (entity.ContainsMask(ref HMasks.NetworkEntityTagComponent))
+                if (entity.ContainsMask(ref networkEntityTagMask))
                 {
                     if (isConnected)
                     {
