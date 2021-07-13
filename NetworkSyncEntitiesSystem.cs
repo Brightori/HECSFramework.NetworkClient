@@ -63,7 +63,7 @@ namespace Systems
             }
 
             dataSenderSystem.SendCommandToServer(new SyncClientNetworkCommand { ClientGuid = networkClient.Owner.GUID, World = 0 });
-        }
+        } 
 
         public void ComponentReact(IComponent component, bool isAdded)
         {

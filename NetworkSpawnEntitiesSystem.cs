@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Systems
@@ -43,13 +44,21 @@ namespace Systems
 
         public async void ProcessSpawnCommand(SpawnEntityCommand command)
         {
+            //todo сюда дописать установку позиции и вращения, после того как будет понятно как разрулить трансформ компонент на сервере и клиенте
+            //actor.GetHECSComponent<TransformComponent>().SetPosition()
+            await SpawnNetworkEntity(command);
+        }
+
+        private async Task SpawnNetworkEntity(SpawnEntityCommand command)
+        {
             if (command.IsNeedRecieveConfirm)
                 EntityManager.GetSingleSystem<DataSenderSystem>().SendCommandToServer(new ConfirmRecieveCommand { Index = command.Index });
 
             if (alrdyHaveThisEntities.Contains(command.CharacterGuid))
                 return;
 
-            var actor = await command.Entity.GetNetworkActorFromResolver();
+            var resolver = MessagePack.MessagePackSerializer.Deserialize<EntityResolver>(command.Entity);
+            var actor = await resolver.GetNetworkActorFromResolver();
 
             if (actor == null)
                 alrdyHaveThisEntities.Add(command.CharacterGuid);
@@ -58,10 +67,8 @@ namespace Systems
 
             actor.GetOrAddComponent<ReplicatedNetworkEntityComponent>();
             actor.Init();
-
-            //todo сюда дописать установку позиции и вращения, после того как будет понятно как разрулить трансформ компонент на сервере и клиенте
-            //actor.GetHECSComponent<TransformComponent>().SetPosition()
         }
+
 
         public void CommandGlobalReact(RemoveEntityFromClientCommand command)
         {
@@ -119,7 +126,7 @@ namespace Systems
                         {
                             CharacterGuid = entity.GUID,
                             ClientGuid = networkClient.ClientGuid,
-                            Entity = new EntityResolver().GetEntityResolver(entity),
+                            Entity =  MessagePack.MessagePackSerializer.Serialize(new EntityResolver().GetEntityResolver(entity)),
                             Index = 0,
                             IsNeedRecieveConfirm = false,
                         });
