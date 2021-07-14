@@ -11,11 +11,13 @@ namespace Systems
         private IDataSenderSystem dataSenderSystem;
 
         public Guid ListenerGuid { get; }
+        private HECSMask networkEntityTagComponent = HMasks.GetMask<NetworkEntityTagComponent>();
+
 
         public override void InitSystem()
         {
             Owner.TryGetSystem(out dataSenderSystem);
-            var networkEntities = EntityManager.Filter(HMasks.NetworkEntityTagComponent);
+            var networkEntities = EntityManager.Filter(networkEntityTagComponent);
 
             foreach (var networkEntity in networkEntities)
             {
@@ -42,7 +44,7 @@ namespace Systems
 
         public void EntityReact(IEntity entity, bool isAdded)
         {
-            if (entity.ContainsMask(ref HMasks.NetworkEntityTagComponent))
+            if (entity.ContainsMask(ref networkEntityTagComponent))
             {
                 foreach (var nc in entity.GetComponentsByType<INetworkComponent>())
                 {
