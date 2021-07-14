@@ -14,7 +14,7 @@ namespace HECSFramework.Unity
         partial void NetworkAwake()
         {
             networkManager = new Entity("NetworkManager");
-            networkManagerContainer.Init(networkManager);
+            networkManagerContainer?.Init(networkManager);
         }
 
         partial void InitNetWorkEntities()
