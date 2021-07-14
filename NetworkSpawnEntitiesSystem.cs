@@ -47,7 +47,7 @@ namespace Systems
         {
             //todo сюда дописать установку позиции и вращения, после того как будет понятно как разрулить трансформ компонент на сервере и клиенте
             //actor.GetHECSComponent<TransformComponent>().SetPosition()
-            await SpawnNetworkEntity(command);
+            await Task.Run(()=> SpawnNetworkEntity(command));
         }
 
         private async Task SpawnNetworkEntity(SpawnEntityCommand command)
@@ -59,12 +59,16 @@ namespace Systems
                 return;
 
             var resolver = command.Entity;
+            var unpack = new UnPackEntityResolver(resolver);
+            
             var actor = await resolver.GetNetworkActorFromResolver();
-
             if (actor == null)
-                alrdyHaveThisEntities.Add(command.CharacterGuid);
-            else
+            {
+                Debug.LogAssertion("не смогли заспаунить актора " + command.CharacterGuid);
                 return;
+            }
+            else
+                alrdyHaveThisEntities.Add(command.CharacterGuid);
 
             actor.GetOrAddComponent<ReplicatedNetworkEntityComponent>();
             actor.Init();
@@ -127,7 +131,7 @@ namespace Systems
                         {
                             CharacterGuid = entity.GUID,
                             ClientGuid = networkClient.ClientGuid,
-                            Entity =  new EntityResolver().GetEntityResolver(entity),
+                            Entity = EntityManager.ResolversMap.GetNetworkEntityResolver(entity),
                             Index = 0,
                             IsNeedRecieveConfirm = false,
                         });
@@ -161,7 +165,7 @@ namespace Systems
                     dataSenderSystem.SendCommandToServer(new RegisterClientEntityOnServerCommand
                     {
                         ClientGuid = networkClient.ClientGuid,
-                        Entity = new EntityResolver().GetEntityResolver(entity),
+                        Entity = EntityManager.ResolversMap.GetNetworkEntityResolver(entity),
                     }, LiteNetLib.DeliveryMethod.ReliableUnordered);
                 }
             }

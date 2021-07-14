@@ -166,8 +166,8 @@ namespace Systems
                         Client = netID.GUID,
                     };
 
-                    dataSenderSystem.SendCommand(peer, Guid.Empty, connect);
                     connectionHolderComponent.serverPeer = peer;
+                    dataSenderSystem.SendCommandToServer(connect);
                     break;
                 case NetWorkSystemState.Sync:
                     if (peer.ConnectionState == ConnectionState.Disconnected)
