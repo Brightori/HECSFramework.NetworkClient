@@ -72,6 +72,9 @@ namespace Systems
                     else
                         dataSenderSystem.SendSyncComponentToServer(networkComponents[i]);
                 }
+
+                networkComponents[i].IsDirty = false;
+                networkComponents[i].Version++;
             }
         }
     }
