@@ -58,7 +58,7 @@ namespace Systems
             if (alrdyHaveThisEntities.Contains(command.CharacterGuid))
                 return;
 
-            var resolver = MessagePack.MessagePackSerializer.Deserialize<EntityResolver>(command.Entity);
+            var resolver = command.Entity;
             var actor = await resolver.GetNetworkActorFromResolver();
 
             if (actor == null)
@@ -127,7 +127,7 @@ namespace Systems
                         {
                             CharacterGuid = entity.GUID,
                             ClientGuid = networkClient.ClientGuid,
-                            Entity =  MessagePack.MessagePackSerializer.Serialize(new EntityResolver().GetEntityResolver(entity)),
+                            Entity =  new EntityResolver().GetEntityResolver(entity),
                             Index = 0,
                             IsNeedRecieveConfirm = false,
                         });
