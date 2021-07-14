@@ -36,8 +36,8 @@ namespace Systems
         private float nextConnectTime;
         private float intervalConnectTime = 5;
 
-        [Required] private INetworkSyncEntitiesSystem syncSystem;
         [Required] private INetworkSpawnEntitiesSystem spawnSystem;
+        [Required] private SyncComponentsClientSystem syncComponentsSystem;
         [Required] private IDataSenderSystem dataSenderSystem;
         [Required] private ConnectionsHolderComponent connectionHolderComponent;
 
@@ -45,9 +45,9 @@ namespace Systems
 
         public override void InitSystem()
         {
-            Owner.TryGetSystem(out syncSystem);
             Owner.TryGetSystem(out spawnSystem);
             Owner.TryGetSystem(out dataSenderSystem);
+            Owner.TryGetSystem(out syncComponentsSystem);
             connectionHolderComponent = Owner.GetHECSComponent<ConnectionsHolderComponent>();
             client = new NetManager(connectionHolderComponent.Listener) { DisconnectTimeout = 20000 };
         }
@@ -175,7 +175,7 @@ namespace Systems
                         EntityManager.Command(new CloseConnectionCommand());
                         return;
                     }
-                    syncSystem.SyncNetworkComponents();
+                    syncComponentsSystem.SyncComponents();
                     break;
                 case NetWorkSystemState.Disconnect:
                     break;
