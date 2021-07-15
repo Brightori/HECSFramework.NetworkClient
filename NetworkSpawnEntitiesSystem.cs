@@ -47,7 +47,7 @@ namespace Systems
         {
             //todo сюда дописать установку позиции и вращения, после того как будет понятно как разрулить трансформ компонент на сервере и клиенте
             //actor.GetHECSComponent<TransformComponent>().SetPosition()
-            await Task.Run(()=> SpawnNetworkEntity(command));
+            await SpawnNetworkEntity(command);
         }
 
         private async Task SpawnNetworkEntity(SpawnEntityCommand command)
