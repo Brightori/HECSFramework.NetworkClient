@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace Systems
 {
-    [Serializable, BluePrint]
+    [Serializable, BluePrint][RequiredAtContainer(typeof(ServerConnectionsComponent))]
     public class NetworkSystem : BaseSystem, INetworkSystem, ICustomUpdatable, ILateStart,
         IReactGlobalCommand<ConnectToServerCommand>,
         IReactGlobalCommand<ClientConnectSuccessCommand>,
