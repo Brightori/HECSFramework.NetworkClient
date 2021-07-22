@@ -161,14 +161,12 @@ namespace Systems
 
                     var neededMask = HMasks.GetMask<NetworkClientTagComponent>();
                     EntityManager.TryGetEntityByComponents(out var netID, ref neededMask);
-                    var appVer = EntityManager.GetSingleComponent<ApplVersionComponent>();
+                    var appVer = EntityManager.GetSingleComponent<AppVersionComponent>();
 
                     var connect = new ClientConnectCommand
                     {
                         Client = netID.GUID,
-                        Preffix = appVer.Prefix,
                         Version = appVer.Version,
-                        Suffix = appVer.Suffix,
                     };
 
                     connectionHolderComponent.serverPeer = peer;
