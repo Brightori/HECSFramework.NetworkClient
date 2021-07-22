@@ -9,13 +9,12 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using UnityEditor.UIElements;
 using UnityEngine;
 
 namespace Systems
 {
     [Serializable, BluePrint]
-    [RequiredAtContainer(typeof(ServerConnectionsComponent))]
+    [RequiredAtContainer(typeof(ServerConnectionsComponent), typeof(NetworkClientTagComponent))]
     public class NetworkSystem : BaseSystem, INetworkSystem, ICustomUpdatable, ILateStart,
         IReactGlobalCommand<ConnectToServerCommand>,
         IReactGlobalCommand<ClientConnectSuccessCommand>,
