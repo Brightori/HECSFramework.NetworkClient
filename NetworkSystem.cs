@@ -175,7 +175,7 @@ namespace Systems
                         EntityManager.Command(new CloseConnectionCommand());
                         return;
                     }
-                    syncComponentsSystem.SyncComponents();
+                    Owner.Command(new SyncComponentsCommand());
                     break;
                 case NetWorkSystemState.Disconnect:
                     break;
