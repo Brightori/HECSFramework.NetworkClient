@@ -14,7 +14,8 @@ using UnityEngine;
 
 namespace Systems
 {
-    [Serializable, BluePrint][RequiredAtContainer(typeof(ServerConnectionsComponent))]
+    [Serializable, BluePrint]
+    [RequiredAtContainer(typeof(ServerConnectionsComponent))]
     public class NetworkSystem : BaseSystem, INetworkSystem, ICustomUpdatable, ILateStart,
         IReactGlobalCommand<ConnectToServerCommand>,
         IReactGlobalCommand<ClientConnectSuccessCommand>,
@@ -160,10 +161,14 @@ namespace Systems
 
                     var neededMask = HMasks.GetMask<NetworkClientTagComponent>();
                     EntityManager.TryGetEntityByComponents(out var netID, ref neededMask);
+                    var appVer = EntityManager.GetSingleComponent<ApplVersionComponent>();
 
                     var connect = new ClientConnectCommand
                     {
                         Client = netID.GUID,
+                        Preffix = appVer.Prefix,
+                        Version = appVer.Version,
+                        Suffix = appVer.Suffix,
                     };
 
                     connectionHolderComponent.serverPeer = peer;
