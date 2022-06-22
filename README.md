@@ -1,2 +1,2 @@
-# HECSFramework.NetworkClient
-hecs network client for unity
+# Network.Client
+

@@ -11,12 +11,13 @@ public class ServerConnectionBluePrint : ScriptableObject
     [Space(20)]
     public string Address = "localhost";
     public int Port = 8080;
-    public int LocalPort = 4040;
+    private int localPort = 4040;
+    public int LocalPort => localPort == 0 ? localPort = Random.Range(6000, 8500) : localPort;
     public string ServerKey = "ClausUmbrella";
 
     private void OnEnable()
     {
         if (IsRandomLocalPort)
-            LocalPort = Random.Range(6000, 8500);
+            localPort = Random.Range(6000, 8500);
     }
 }

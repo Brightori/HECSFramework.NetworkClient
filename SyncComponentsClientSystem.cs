@@ -8,7 +8,7 @@ namespace Systems
     public class SyncComponentsClientSystem : BaseSystem, IReactComponent, IReactEntity
     {
         private ConcurrencyList<INetworkComponent> networkComponents = new ConcurrencyList<INetworkComponent>();
-        private IDataSenderSystem dataSenderSystem;
+        private DataSenderSystem dataSenderSystem;
 
         public Guid ListenerGuid { get; }
         private HECSMask networkEntityTagComponent = HMasks.GetMask<NetworkEntityTagComponent>();
@@ -65,16 +65,16 @@ namespace Systems
 
             for (int i = 0; i < currentCount; i++)
             {
-                if (networkComponents[i].IsDirty && networkComponents[i].IsAlive)
+                if (networkComponents.Data[i].IsDirty && networkComponents.Data[i].IsAlive)
                 {
-                    if (networkComponents[i] is IUnreliable)
-                        dataSenderSystem.SendSyncComponentToServer(networkComponents[i], LiteNetLib.DeliveryMethod.Unreliable);
+                    if (networkComponents.Data[i] is IUnreliable)
+                        dataSenderSystem.SendSyncComponentToServer(networkComponents.Data[i], LiteNetLib.DeliveryMethod.Unreliable);
                     else
-                        dataSenderSystem.SendSyncComponentToServer(networkComponents[i]);
+                        dataSenderSystem.SendSyncComponentToServer(networkComponents.Data[i]);
                 }
 
-                networkComponents[i].IsDirty = false;
-                networkComponents[i].Version++;
+                networkComponents.Data[i].IsDirty = false;
+                networkComponents.Data[i].Version++;
             }
         }
     }

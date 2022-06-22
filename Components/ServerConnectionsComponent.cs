@@ -1,15 +1,41 @@
 using HECSFramework.Core;
 using HECSFramework.Unity;
 using System;
-using UnityEngine;
+using System.Linq;
 
 namespace Components
 {
     [Serializable, BluePrint]
-    [Documentation("Network", "êîìïîíåíò êîòîðûé ñîäåæèò àäðåñà ñåðâåðîâ, èñïîëüçóåòñÿ â Network system ïðè ïîäêëþ÷åíèè ")]
+    [Documentation("Network", "ÐºÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚ ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ð¹ ÑÐ¾Ð´ÐµÐ¶Ð¸Ñ‚ Ð°Ð´Ñ€ÐµÑÐ° ÑÐµÑ€Ð²ÐµÑ€Ð¾Ð², Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð² Network system Ð¿Ñ€Ð¸ Ð¿Ð¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ð¸ ")]
     [Documentation("Client")]
     public class ServerConnectionsComponent : BaseComponent
     {
         public ServerConnectionBluePrint[] ServerConnectionBluePrints;
+
+        public ServerConnectionBluePrint GetConnection()
+        {
+            if (TryGetOverrideConnection(out var connection)) return connection;
+            return ServerConnectionBluePrints.First(x => x.IsActive);
+        }
+        
+        private bool TryGetOverrideConnection(out ServerConnectionBluePrint bluePrint)
+        {
+            var args = Environment.GetCommandLineArgs();
+            foreach (string arg in args)
+            {
+                if (string.IsNullOrEmpty(arg)) continue;
+                
+                var argument = arg.Substring(1, arg.Length - 1);
+                var connection = ServerConnectionBluePrints.FirstOrDefault(a => a.name.Equals(argument));
+                if (connection == null)
+                    continue;
+
+                bluePrint = connection;
+                return true;
+            }
+
+            bluePrint = null;
+            return false;
+        }
     }
 }

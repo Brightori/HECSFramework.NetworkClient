@@ -1,6 +1,7 @@
 ﻿using HECSFramework.Core;
 using HECSFramework.Network;
 using LiteNetLib;
+using System;
 
 namespace Systems
 {
@@ -8,7 +9,12 @@ namespace Systems
     {
         public void SendCommandToServer<T>(T networkCommand, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkCommand, IData
         {
-            SendCommand(connectionsHolder.serverPeer, SystemGuid, networkCommand);
+            SendCommand(connectionsHolder.serverPeer, Guid.Empty, networkCommand);
+        }    
+        
+        public void SendCommandToServer<T>(T networkCommand, Guid address, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkCommand, IData
+        {
+            SendCommand(connectionsHolder.serverPeer, address, networkCommand);
         }
 
         public void SendSyncComponentToServer<T>(T component, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkComponent 
@@ -16,11 +22,5 @@ namespace Systems
             var container = EntityManager.ResolversMap.GetComponentContainer(component);
             connectionsHolder.serverPeer.Send(PackResolverContainer(container), deliveryMethod);
         }
-    }
-
-    public partial interface IDataSenderSystem : ISystem
-    {
-        void SendCommandToServer<T>(T networkCommand, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkCommand, IData;
-        void SendSyncComponentToServer<T>(T component, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableUnordered) where T : INetworkComponent;
     }
 }

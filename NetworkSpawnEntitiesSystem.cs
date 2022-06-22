@@ -6,169 +6,157 @@ using HECSFramework.Unity.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using HECSFramework.Network;
 using UnityEngine;
 
 namespace Systems
 {
     [Serializable, BluePrint]
-    public class NetworkSpawnEntitiesSystem : BaseSystem,
-        INetworkSpawnEntitiesSystem, IReactEntity, IAfterEntityInit,
+    public partial class NetworkSpawnEntitiesSystem : BaseSystem, IUpdatable,
+        INetworkSpawnEntitiesSystem, IReactEntity,
         IReactGlobalCommand<RemoveEntityFromClientCommand>,
-        IReactGlobalCommand<SpawnCompleteCommand>,
         IReactGlobalCommand<SpawnEntityCommand>,
-        IReactGlobalCommand<ClientConnectSuccessCommand>
+        IReactGlobalCommand<ClientConnectSuccessCommand>,
+        IReactGlobalCommand<SyncEntitiesStartedNetworkCommand>
     {
-        public YieldInstruction Interval { get; } = new WaitForSeconds(2);
+        private const float EntityRemovalTimeout = 5;
+        private const float SyncTimeout = 15;
 
-        private HashSet<Guid> alrdyHaveThisEntities = new HashSet<Guid>();
-        private ConnectionsHolderComponent connectionsHolderComponent;
-        private IDataSenderSystem dataSenderSystem;
-        private NetworkClientTagComponent networkClient;
-
-        private bool isConnected;
-
-        private HECSMask replicatedComponentMask = HMasks.GetMask<ReplicatedNetworkEntityComponent>();
-        private HECSMask networkEntityTagMask = HMasks.GetMask<NetworkEntityTagComponent>();
-
+        private List<(Guid, float)> awaitingDeletionEntities = new List<(Guid, float)>();
+        private List<Guid> awaitingSpawnEntities = new List<Guid>();
+        private HashSet<Guid> alreadyHaveTheseEntities = new HashSet<Guid>();
+        private float startSyncTime;
+        
         public override void InitSystem()
         {
-            Owner.TryGetHecsComponent(out networkClient);
-            Owner.TryGetHecsComponent(out connectionsHolderComponent);
         }
-
-        public void AfterEntityInit()
+        
+        public void UpdateLocal()
         {
-            Owner.TryGetSystem(out dataSenderSystem);
-        }
-
-        public async void ProcessSpawnCommand(SpawnEntityCommand command)
-        {
-            //todo сюда дописать установку позиции и вращения, после того как будет понятно как разрулить трансформ компонент на сервере и клиенте
-            //actor.GetHECSComponent<TransformComponent>().SetPosition()
-            await SpawnNetworkEntity(command);
-        }
-
-        private async Task SpawnNetworkEntity(SpawnEntityCommand command)
-        {
-            if (command.IsNeedRecieveConfirm)
-                EntityManager.GetSingleSystem<DataSenderSystem>().SendCommandToServer(new ConfirmRecieveCommand { Index = command.Index });
-
-            if (alrdyHaveThisEntities.Contains(command.CharacterGuid))
-                return;
-
-            var resolver = command.Entity;
-            var unpack = new UnPackEntityResolver(resolver);
-            
-            var actor = await resolver.GetNetworkActorFromResolver();
-            if (actor == null)
+            for (var i = 0; i < awaitingDeletionEntities.Count; i++)
             {
-                Debug.LogAssertion("не смогли заспаунить актора " + command.CharacterGuid);
-                return;
-            }
-            else
-                alrdyHaveThisEntities.Add(command.CharacterGuid);
+                var awaitingEntity = awaitingDeletionEntities[i].Item1;
+                var awaitingStartTime = awaitingDeletionEntities[i].Item2;
 
-            actor.GetOrAddComponent<ReplicatedNetworkEntityComponent>();
-            actor.Init();
-        }
-
-
-        public void CommandGlobalReact(RemoveEntityFromClientCommand command)
-        {
-            if (!EntityManager.TryGetEntityByID(command.EntityToRemove, out var entity))
-                return;
-
-            entity.HecsDestroy();
-        }
-
-        public void CommandGlobalReact(SpawnCompleteCommand command)
-        {
-            if (command.SyncIndex == connectionsHolderComponent.SyncIndex)
-                return;
-
-            if (command.WorldIndex != networkClient.WorldIndex)
-                return;
-
-            var currentNetworkEntities = EntityManager.Filter(HMasks.GetMask<ReplicatedNetworkEntityComponent>(), networkClient.WorldIndex);
-
-            foreach (var e in currentNetworkEntities)
-            {
-                if (e.TryGetHecsComponent(out WorldSliceIndexComponent sliceIndex) &&
-                    sliceIndex.Index > command.SyncIndex)
-                    continue;
-
-                if (command.SpawnEntities.Any(x => x.CharacterGuid == e.GUID))
-                    continue;
-                else
-                    e.HecsDestroy();
-            }
-
-            foreach (var spawn in command.SpawnEntities)
-            {
-                if (EntityManager.TryGetEntityByID(spawn.CharacterGuid, out var entity))
-                    continue;
-
-                ProcessSpawnCommand(spawn);
-            }
-
-            connectionsHolderComponent.SyncIndex = command.SyncIndex;
-        }
-
-        public void CommandGlobalReact(SpawnEntityCommand command)
-            => ProcessSpawnCommand(command);
-
-        public void EntityReact(IEntity entity, bool isAdded)
-        {
-            if (isAdded)
-            {
-                if (entity.ContainsMask(ref networkEntityTagMask))
+                if (EntityManager.TryGetEntityByID(awaitingEntity, out var entity))
                 {
-                    if (isConnected)
-                    {
-                        dataSenderSystem.SendCommandToServer(new SpawnEntityCommand
-                        {
-                            CharacterGuid = entity.GUID,
-                            ClientGuid = networkClient.ClientGuid,
-                            Entity = EntityManager.ResolversMap.GetNetworkEntityResolver(entity),
-                            Index = 0,
-                            IsNeedRecieveConfirm = false,
-                        });
-                    }
-                    else
-                    {
-                        alrdyHaveThisEntities.Add(entity.GUID);
-                    }
+                    EntityManager.Command(new DestroyEntityWorldCommand { Entity = entity });
+                    awaitingDeletionEntities.RemoveAt(i--);
+                    continue;
+                }
+
+                if (Time.time - awaitingStartTime > EntityRemovalTimeout)
+                {
+                    HECSDebug.LogWarning($"Cannot remove nonexistant entity: {awaitingEntity}");
+                    awaitingDeletionEntities.RemoveAt(i--);
                 }
             }
-            else
+
+            if (awaitingSpawnEntities.Count != 0 && Time.time - startSyncTime > SyncTimeout)
             {
-                alrdyHaveThisEntities.Remove(entity.GUID);
+                HECSDebug.LogError($"Sync entities timeout! Entities unable to sync: {string.Join(", ", awaitingSpawnEntities)}");
+                awaitingSpawnEntities.Clear();
+                TrySendSyncEndedCommand();
             }
+        }
+        
+        public void CommandGlobalReact(RemoveEntityFromClientCommand command)
+        {
+            if (!EntityManager.TryGetEntityByID(command.EntityToRemove, out var entity) || !entity.IsAlive)
+            {
+                awaitingDeletionEntities.Add((command.EntityToRemove,Time.time));
+                return;
+            }
+
+            EntityManager.Command(new DestroyEntityWorldCommand { Entity = entity });
+        }
+
+        public async void CommandGlobalReact(SpawnEntityCommand command)
+        {
+            HECSDebug.LogDebug($"Spawning network entity: {command.CharacterGuid}");
+            if (alreadyHaveTheseEntities.Contains(command.CharacterGuid))
+            {
+                HECSDebug.LogWarning($"Cannot spawn existing entity: {command.CharacterGuid}");
+                return;
+            }
+            
+            alreadyHaveTheseEntities.Add(command.CharacterGuid);
+
+            var resolver = command.Entity;
+            var actor = await resolver.GetNetworkActorFromResolver();
+            
+            if (actor == null)
+            {
+                HECSDebug.LogWarning($"Cannot spawn entity: {command.CharacterGuid}");
+                return;
+            }
+            
+            actor.GetOrAddComponent<ReplicatedNetworkEntityComponent>();
+            HECSDebug.LogDebug($"Network entity spawn complete: {command.CharacterGuid}");
+
+            foreach (var c in actor.GetAllComponents)
+                if (c != null && c is IAfterInitSync initSync)
+                    initSync.AfterInitSync();
+        }
+        
+        public void EntityReact(IEntity entity, bool isAdded)
+        {
+            if (!isAdded)
+                alreadyHaveTheseEntities.Remove(entity.GUID);
+            else if (entity.TryGetHecsComponent(out NetworkEntityTagComponent _)) 
+                alreadyHaveTheseEntities.Add(entity.GUID);
+            
+            if (awaitingSpawnEntities.Count == 0)
+                return;
+            
+            awaitingSpawnEntities.Remove(entity.GUID);
+            TrySendSyncEndedCommand();
         }
 
         public void CommandGlobalReact(ClientConnectSuccessCommand command)
         {
-            if (dataSenderSystem == null)
+            foreach (var entityID in alreadyHaveTheseEntities)
             {
-                Owner.TryGetSystem(out dataSenderSystem);
-            }
+                if (!EntityManager.TryGetEntityByID(entityID, out var entity)) 
+                    continue;
+                if (entity.ContainsMask(ref HMasks.ReplicatedNetworkEntityComponent))
+                    continue;
 
-            foreach (var entityID in alrdyHaveThisEntities)
-            {
-                if (EntityManager.TryGetEntityByID(entityID, out var entity))
+                EntityManager.GetSingleSystem<DataSenderSystem>().SendCommandToServer(new RegisterClientEntityOnServerCommand
                 {
-                    if (entity.ContainsMask(ref replicatedComponentMask))
-                        continue;
+                    ClientGuid = Owner.GetNetworkClientTagComponent().ClientGuid,
+                    Entity = EntityManager.ResolversMap.GetNetworkEntityResolver(entity),
+                });
+            }
+        }
 
-                    dataSenderSystem.SendCommandToServer(new RegisterClientEntityOnServerCommand
-                    {
-                        ClientGuid = networkClient.ClientGuid,
-                        Entity = EntityManager.ResolversMap.GetNetworkEntityResolver(entity),
-                    }, LiteNetLib.DeliveryMethod.ReliableUnordered);
+        public void CommandGlobalReact(SyncEntitiesStartedNetworkCommand command)
+        {
+            startSyncTime = Time.time;
+            awaitingSpawnEntities = new List<Guid>(command.Entities);
+            HECSDebug.LogDebug("Network entities spawning is started.");
+
+            for (var i = 0; i < awaitingSpawnEntities.Count; i++)
+            {
+                var entity = awaitingSpawnEntities[i];
+                if (EntityManager.TryGetEntityByID(entity, out _))
+                {
+                    awaitingSpawnEntities.Remove(entity);
+                    i--;
                 }
             }
+
+            TrySendSyncEndedCommand();
+        }
+
+        private void TrySendSyncEndedCommand()
+        {
+            if (awaitingSpawnEntities.Count != 0) return;
+
+            HECSDebug.LogDebug("Network entities spawning is complete.");
+            EntityManager.TryGetEntityByComponents(out var player, ref HMasks.PlayerTagComponent);
+            EntityManager.GetSingleSystem<DataSenderSystem>().SendCommandToServer(new SyncEntitiesEndedNetworkCommand { Client = player.GUID });
         }
     }
 

@@ -1,24 +1,25 @@
-﻿using Commands;
+﻿using System;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using Commands;
 using Components;
+using HECSFramework;
 using HECSFramework.Core;
 using HECSFramework.Network;
 using HECSFramework.Unity;
 using LiteNetLib;
 using MessagePack;
-using System;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 using UnityEngine;
 
 namespace Systems
 {
     [Serializable, BluePrint]
     [RequiredAtContainer(typeof(ServerConnectionsComponent), typeof(NetworkClientTagComponent))]
-    public class NetworkSystem : BaseSystem, INetworkSystem, ICustomUpdatable, ILateStart,
-        IReactGlobalCommand<ConnectToServerCommand>,
+    public class NetworkSystem : BaseSystem, 
+        INetworkSystem, ICustomUpdatable, ILateStart, IUpdatable,
         IReactGlobalCommand<ClientConnectSuccessCommand>,
-        IReactGlobalCommand<SyncServerComponentsCommand>
+        IReactGlobalCommand<SyncServerComponentsCommand>, IOnApplicationQuit
     {
         public enum NetWorkSystemState { Wait, Connect, BeforeSync, Sync, Disconnect }
 
@@ -36,20 +37,16 @@ namespace Systems
         private float nextConnectTime;
         private float intervalConnectTime = 5;
 
-        [Required] private INetworkSpawnEntitiesSystem spawnSystem;
-        [Required] private SyncComponentsClientSystem syncComponentsSystem;
-        [Required] private IDataSenderSystem dataSenderSystem;
+        [Required] private DataSenderSystem dataSenderSystem;
         [Required] private ConnectionsHolderComponent connectionHolderComponent;
 
         private HECSMask Replicated = HMasks.GetMask<ReplicatedNetworkEntityComponent>();
 
         public override void InitSystem()
         {
-            Owner.TryGetSystem(out spawnSystem);
             Owner.TryGetSystem(out dataSenderSystem);
-            Owner.TryGetSystem(out syncComponentsSystem);
             connectionHolderComponent = Owner.GetHECSComponent<ConnectionsHolderComponent>();
-            client = new NetManager(connectionHolderComponent.Listener) { DisconnectTimeout = 20000 };
+            client = new NetManager(connectionHolderComponent.Listener);
         }
 
         private void ListenerOnPeerConnectedEvent(NetPeer peer)
@@ -95,7 +92,10 @@ namespace Systems
             => Debug.LogError(socketerror.ToString());
 
         private void ListenerOnPeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectinfo)
-            => Debug.Log($"Disconnected. Reason: {disconnectinfo.Reason.ToString()}");
+        {
+            Debug.Log($"Disconnected. Reason: {disconnectinfo.Reason.ToString()}");
+            EntityManager.GlobalCommand(new DisconnectedClientCommand { Reason = disconnectinfo.Reason });
+        }
 
         public bool Equals(ISystem other)
             => other is INetworkSystem;
@@ -107,11 +107,7 @@ namespace Systems
             client.PollEvents();
             base.Dispose();
         }
-
-        public void CommandGlobalReact(ConnectToServerCommand command)
-        {
-        }
-
+        
         private void ConnectingLoop()
         {
             if (nextConnectTime > Time.time)
@@ -140,8 +136,10 @@ namespace Systems
 
         public void CommandGlobalReact(ClientConnectSuccessCommand command)
         {
-            Debug.Log("Connected successfully.");
-            interval = new WaitForSeconds(command.ServerTickIntervalMilliseconds / 1000f);
+            HECSDebug.Log($"Connected successfully to: <color=orange>{serverInfo.address}:{serverInfo.port}</color>.");
+            EntityManager.GetSingleComponent<ServerInfoComponent>().ServerTickMs = command.ServerData.ServerTickIntervalMilliseconds;
+            interval = new WaitForSeconds(command.ServerData.ServerTickIntervalMilliseconds / 1000f);
+            client.DisconnectTimeout = command.ServerData.DisconnectTimeoutMs;
         }
 
         public void UpdateCustom()
@@ -158,13 +156,12 @@ namespace Systems
                 case NetWorkSystemState.BeforeSync:
                     State = NetWorkSystemState.Sync;
 
-                    var neededMask = HMasks.GetMask<NetworkClientTagComponent>();
-                    EntityManager.TryGetEntityByComponents(out var netID, ref neededMask);
+                    var netId = EntityManager.GetSingleComponent<NetworkClientTagComponent>();
                     var appVer = EntityManager.GetSingleComponent<AppVersionComponent>();
 
                     var connect = new ClientConnectCommand
                     {
-                        Client = netID.GUID,
+                        Client = netId.ClientGuid,
                         Version = appVer.Version,
                     };
 
@@ -177,7 +174,8 @@ namespace Systems
                         EntityManager.Command(new CloseConnectionCommand());
                         return;
                     }
-                    Owner.Command(new SyncComponentsCommand());
+                    Owner.Command(new NetworkTickCommand());
+                    EntityManager.Command(new NetworkTickCommand(), -1);
                     break;
                 case NetWorkSystemState.Disconnect:
                     break;
@@ -204,12 +202,15 @@ namespace Systems
 
         public void LateStart()
         {
-            var connectionsToServer = Owner.GetHECSComponent<ServerConnectionsComponent>();
-            var neededConnection = connectionsToServer.ServerConnectionBluePrints.First(x => x.IsActive);
-
+            var neededConnection = Owner.GetHECSComponent<ServerConnectionsComponent>().GetConnection();
             Start(neededConnection.LocalPort);
             serverInfo = (neededConnection.Address, Convert.ToInt32(neededConnection.Port), neededConnection.ServerKey);
             State = NetWorkSystemState.Connect;
+        }
+
+        public void UpdateLocal()
+        {
+            //=> dataProcessor.UpdateLocal();
         }
     }
 }
