@@ -1,22 +1,21 @@
-﻿using System;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using Commands;
+﻿using Commands;
 using Components;
-using HECSFramework;
 using HECSFramework.Core;
 using HECSFramework.Network;
 using HECSFramework.Unity;
 using LiteNetLib;
 using MessagePack;
+using System;
+using System.Net;
+using System.Net.Sockets;
 using UnityEngine;
 
 namespace Systems
 {
     [Serializable, BluePrint]
     [RequiredAtContainer(typeof(ServerConnectionsComponent), typeof(NetworkClientTagComponent))]
-    public class NetworkSystem : BaseSystem, 
+    [Documentation(Doc.Network, "The system responsible for working with the world game server")]
+    public class WorldNetworkSystem : BaseSystem, 
         INetworkSystem, ICustomUpdatable, ILateStart, IUpdatable,
         IReactGlobalCommand<ClientConnectSuccessCommand>,
         IReactGlobalCommand<SyncServerComponentsCommand>, IOnApplicationQuit
@@ -65,9 +64,9 @@ namespace Systems
             dataProcessor.Process(message);
         }
 
-        public void Start(int localPort)
+        public void InitClient()
         {
-            client.Start(localPort);
+            client.Start();
             connectionHolderComponent.Listener.NetworkReceiveEvent += ListenerOnNetworkReceiveEvent;
             connectionHolderComponent.Listener.PeerDisconnectedEvent += ListenerOnPeerDisconnectedEvent;
             connectionHolderComponent.Listener.PeerConnectedEvent += ListenerOnPeerConnectedEvent;
@@ -157,12 +156,12 @@ namespace Systems
                     State = NetWorkSystemState.Sync;
 
                     var netId = EntityManager.GetSingleComponent<NetworkClientTagComponent>();
-                    var appVer = EntityManager.GetSingleComponent<AppVersionComponent>();
+                    //var appVer = EntityManager.GetSingleComponent<AppVersionComponent>();
 
                     var connect = new ClientConnectCommand
                     {
                         Client = netId.ClientGuid,
-                        Version = appVer.Version,
+                        //   Version = appVer.Version,
                     };
 
                     connectionHolderComponent.serverPeer = peer;
@@ -200,17 +199,27 @@ namespace Systems
             }
         }
 
-        public void LateStart()
+        public void ConnectTo(string address, int port)
         {
-            var neededConnection = Owner.GetHECSComponent<ServerConnectionsComponent>().GetConnection();
-            Start(neededConnection.LocalPort);
-            serverInfo = (neededConnection.Address, Convert.ToInt32(neededConnection.Port), neededConnection.ServerKey);
+            if(State != NetWorkSystemState.Wait)
+            {
+                Debug.LogError("Error connecting to the game world, the connection is already establisheds");
+                return;
+            }
+            Debug.Log($"Подключаюсь к миру по IP:{address}:{port}");
+            InitClient();
+            serverInfo = (address, port, "ClausUmbrella");
             State = NetWorkSystemState.Connect;
         }
 
         public void UpdateLocal()
         {
             //=> dataProcessor.UpdateLocal();
+        }
+
+        public void LateStart()
+        {
+            
         }
     }
 }
@@ -220,6 +229,6 @@ namespace Systems
     public interface INetworkSystem : ISystem
     {
         bool IsReady { get; }
-        NetworkSystem.NetWorkSystemState State { get; }
+        WorldNetworkSystem.NetWorkSystemState State { get; }
     }
 }
