@@ -61,7 +61,7 @@ namespace Systems
                 return;
 
             var message = MessagePackSerializer.Deserialize<ResolverDataContainer>(bytes);
-            dataProcessor.Process(message);
+            dataProcessor.Process(message, Owner.World);
         }
 
         public void InitClient()
@@ -160,8 +160,6 @@ namespace Systems
 
                     var connect = new ClientConnectCommand
                     {
-                        Client = netId.ClientGuid,
-                        //   Version = appVer.Version,
                     };
 
                     connectionHolderComponent.serverPeer = peer;

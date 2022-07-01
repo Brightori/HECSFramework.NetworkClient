@@ -28,7 +28,7 @@ namespace Systems
             }
         }
 
-        public void ComponentReact(IComponent component, bool isAdded)
+        public void ComponentReact<T>(T component, bool isAdded) where T: IComponent
         {
             if (component is INetworkComponent networkComponent)
             {
