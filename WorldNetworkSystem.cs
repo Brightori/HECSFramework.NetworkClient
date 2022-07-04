@@ -40,7 +40,7 @@ namespace Systems
         private float nextConnectTime;
         private float intervalConnectTime = 5;
         private int currentAttempts = 0;
-        
+        private int roomWorldIndex = 0;
 
         [Required] private DataSenderSystem dataSenderSystem;
         [Required] private ConnectionsHolderComponent connectionHolderComponent;
@@ -167,6 +167,7 @@ namespace Systems
 
                     var connect = new ClientConnectCommand
                     {
+                        RoomWorld = roomWorldIndex,
                     };
 
                     connectionHolderComponent.serverPeer = peer;
@@ -204,7 +205,7 @@ namespace Systems
             }
         }
 
-        public async Task<bool> ConnectTo(string address, int port)
+        public async Task<bool> ConnectTo(string address, int port, int roomWorldIndex)
         {
             if (State != NetWorkSystemState.Wait)
             {
@@ -212,18 +213,20 @@ namespace Systems
                 return false;
             }
 
+            this.roomWorldIndex = roomWorldIndex;
             currentAttempts = 0;
             Debug.Log($"Подключаюсь к миру по IP:{address}:{port}");
             InitClient();
             serverInfo = (address, port, "ClausUmbrella");
             State = NetWorkSystemState.Connect;
+
             Connect(serverInfo.address, serverInfo.port, serverInfo.key);
 
             while (State == NetWorkSystemState.Connect)
             {
                 currentAttempts++;
 
-                if (peer != null && peer.ConnectionState == ConnectionState.Connected)
+                if (peer.ConnectionState == ConnectionState.Connected)
                 {
                     State = NetWorkSystemState.BeforeSync;
                     connectionHolderComponent.serverPeer = peer;
@@ -239,6 +242,7 @@ namespace Systems
                 await Task.Delay(10);
             }
 
+            Debug.Log($"attempts: {currentAttempts}  state:{peer.ConnectionState} systemState: {State}");
             return State != NetWorkSystemState.FailToConnect;
         }
 
