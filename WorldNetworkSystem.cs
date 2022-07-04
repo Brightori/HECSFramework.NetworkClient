@@ -8,6 +8,7 @@ using MessagePack;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Systems
@@ -15,12 +16,15 @@ namespace Systems
     [Serializable, BluePrint]
     [RequiredAtContainer(typeof(ServerConnectionsComponent), typeof(NetworkClientTagComponent))]
     [Documentation(Doc.Network, "The system responsible for working with the world game server")]
-    public class WorldNetworkSystem : BaseSystem, 
+    public class WorldNetworkSystem : BaseSystem,
         INetworkSystem, ICustomUpdatable, ILateStart, IUpdatable,
         IReactGlobalCommand<ClientConnectSuccessCommand>,
         IReactGlobalCommand<SyncServerComponentsCommand>, IOnApplicationQuit
     {
-        public enum NetWorkSystemState { Wait, Connect, BeforeSync, Sync, Disconnect }
+        public enum NetWorkSystemState { Wait, Connect, BeforeSync, Sync, Disconnect, FailToConnect }
+
+        //todo перенести в отдельный компонент чт
+        private const int MaxAttemtps = 2000;
 
         private NetManager client;
         private NetPeer peer;
@@ -35,6 +39,8 @@ namespace Systems
 
         private float nextConnectTime;
         private float intervalConnectTime = 5;
+        private int currentAttempts = 0;
+        
 
         [Required] private DataSenderSystem dataSenderSystem;
         [Required] private ConnectionsHolderComponent connectionHolderComponent;
@@ -106,7 +112,7 @@ namespace Systems
             client.PollEvents();
             base.Dispose();
         }
-        
+
         private void ConnectingLoop()
         {
             if (nextConnectTime > Time.time)
@@ -121,6 +127,7 @@ namespace Systems
                 State = NetWorkSystemState.BeforeSync;
                 connectionHolderComponent.serverPeer = peer;
             }
+            else State = NetWorkSystemState.FailToConnect;
         }
 
         private void Connect(string host, int port, string serverKey)
@@ -150,7 +157,7 @@ namespace Systems
                 case NetWorkSystemState.Wait:
                     break;
                 case NetWorkSystemState.Connect:
-                    ConnectingLoop();
+                    //ConnectingLoop();
                     break;
                 case NetWorkSystemState.BeforeSync:
                     State = NetWorkSystemState.Sync;
@@ -197,17 +204,42 @@ namespace Systems
             }
         }
 
-        public void ConnectTo(string address, int port)
+        public async Task<bool> ConnectTo(string address, int port)
         {
-            if(State != NetWorkSystemState.Wait)
+            if (State != NetWorkSystemState.Wait)
             {
                 Debug.LogError("Error connecting to the game world, the connection is already establisheds");
-                return;
+                return false;
             }
+
+            currentAttempts = 0;
             Debug.Log($"Подключаюсь к миру по IP:{address}:{port}");
             InitClient();
             serverInfo = (address, port, "ClausUmbrella");
             State = NetWorkSystemState.Connect;
+            Connect(serverInfo.address, serverInfo.port, serverInfo.key);
+
+            while (State == NetWorkSystemState.Connect)
+            {
+                currentAttempts++;
+
+                if (peer != null && peer.ConnectionState == ConnectionState.Connected)
+                {
+                    State = NetWorkSystemState.BeforeSync;
+                    connectionHolderComponent.serverPeer = peer;
+                    break;
+                }
+                
+                if (currentAttempts > MaxAttemtps)
+                {
+                    State = NetWorkSystemState.FailToConnect;
+                    break;
+                }
+
+                await Task.Delay(10);
+            }
+
+            return State != NetWorkSystemState.FailToConnect;
         }
 
         public void UpdateLocal()
@@ -217,7 +249,7 @@ namespace Systems
 
         public void LateStart()
         {
-            
+
         }
     }
 }
