@@ -104,7 +104,7 @@ namespace Systems
 
         private void Connect(string host, int port, string serverKey, int maxAttemtps)
         {
-            networkClient.Connect(host, port, serverKey, maxAttemtps);
+            networkClient.ConnectTo(host, port, serverKey, maxAttemtps);
             IsReady = true;
         }
 
