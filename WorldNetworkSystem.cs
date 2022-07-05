@@ -124,7 +124,7 @@ namespace Systems
             connectionHolderComponent.serverPeer = peer;
 
             ClientGUID = command.Guid;
-            HECSDebug.Log($"Connected successfully to: <color=orange>{serverInfo.address}:{serverInfo.port}</color>.");
+            HECSDebug.Log($"Connected successfully to: <color=orange>{connectionInfoClientComponent.ServerInfo.Address}:{connectionInfoClientComponent.ServerInfo.Port}</color>.");
             EntityManager.GetSingleComponent<ServerInfoComponent>().ServerTickMs = command.ServerData.ServerTickIntervalMilliseconds;
             interval = new WaitForSeconds(command.ServerData.ServerTickIntervalMilliseconds / 1000f);
             client.DisconnectTimeout = command.ServerData.DisconnectTimeoutMs;
