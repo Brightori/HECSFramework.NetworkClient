@@ -10,7 +10,7 @@ namespace Components
         [SerializeField] private int maxAttempts = 2000;
         [SerializeField]  private float intervalConnectTime = 5;
 
-        public ConnectionInfoOfServer ServerInfo  = new ConnectionInfoOfServer { Key = "ClausUmbrella" };
+        public string Key { get; } = "ClausUmbrella";
 
         [HideInInspector]
         public int RoomWorldIndex = 0;
@@ -25,13 +25,5 @@ namespace Components
         public float IntervalConnectTime { get => intervalConnectTime; }
     }
 
-    public enum NetWorkSystemState { Wait, Connect, BeforeSync, Sync, Disconnect, FailToConnect }
-    
-    [Serializable]
-    public struct ConnectionInfoOfServer
-    {
-        public string Address;
-        public int Port;  
-        public string Key;
-    }
+
 }
