@@ -22,32 +22,25 @@ namespace Systems
         IReactGlobalCommand<ClientConnectSuccessCommand>,
         IReactGlobalCommand<SyncServerComponentsCommand>, IOnApplicationQuit
     {
-        public enum NetWorkSystemState { Wait, Connect, BeforeSync, Sync, Disconnect, FailToConnect }
 
-        //todo перенести в отдельный компонент чт
-        private const int MaxAttemtps = 2000;
+        [Required] private DataSenderSystem dataSenderSystem;
+        [Required] private ConnectionsHolderComponent connectionHolderComponent;
+        [Required] private ConnectionInfoClientComponent connectionInfoClientComponent;
+
+        private HECSMask Replicated = HMasks.GetMask<ReplicatedNetworkEntityComponent>();
 
         private NetManager client;
         private NetPeer peer;
-        private (string address, int port, string key) serverInfo;
-
+        
         public NetWorkSystemState State { get; private set; } = NetWorkSystemState.Wait;
+        
         public YieldInstruction Interval => interval;
         private YieldInstruction interval = new WaitForSeconds(0.02f);
+        
         private IDataProcessor dataProcessor = new HECSDataProcessor();
 
         public bool IsReady { get; private set; }
         public Guid ClientGUID { get; private set; }
-
-        private float nextConnectTime;
-        private float intervalConnectTime = 5;
-        private int currentAttempts = 0;
-        private int roomWorldIndex = 0;
-
-        [Required] private DataSenderSystem dataSenderSystem;
-        [Required] private ConnectionsHolderComponent connectionHolderComponent;
-
-        private HECSMask Replicated = HMasks.GetMask<ReplicatedNetworkEntityComponent>();
 
         public override void InitSystem()
         {
@@ -115,23 +108,6 @@ namespace Systems
             base.Dispose();
         }
 
-        private void ConnectingLoop()
-        {
-            if (nextConnectTime > Time.time)
-                return;
-
-            nextConnectTime = Time.time + intervalConnectTime;
-
-            Connect(serverInfo.address, serverInfo.port, serverInfo.key);
-
-            if (peer != null && peer.ConnectionState == ConnectionState.Connected)
-            {
-                State = NetWorkSystemState.BeforeSync;
-                connectionHolderComponent.serverPeer = peer;
-            }
-            else State = NetWorkSystemState.FailToConnect;
-        }
-
         private void Connect(string host, int port, string serverKey)
         {
             peer?.Disconnect();
@@ -168,14 +144,10 @@ namespace Systems
                 case NetWorkSystemState.BeforeSync:
                     State = NetWorkSystemState.Sync;
 
-                    var netId = EntityManager.GetSingleComponent<NetworkClientTagComponent>();
-                    //var appVer = EntityManager.GetSingleComponent<AppVersionComponent>();
-
                     var connect = new ClientConnectCommand
                     {
-                        RoomWorld = roomWorldIndex,
+                        RoomWorld = connectionInfoClientComponent.RoomWorldIndex,
                     };
-
                     connectionHolderComponent.serverPeer = peer;
                     dataSenderSystem.SendCommandToServer(connect);
                     break;
@@ -219,20 +191,25 @@ namespace Systems
                 return false;
             }
 
-            this.roomWorldIndex = roomWorldIndex;
-            currentAttempts = 0;
+            connectionInfoClientComponent.RoomWorldIndex = roomWorldIndex;
+            connectionInfoClientComponent.CurrentAttempts = 0;
             Debug.Log($"Подключаюсь к миру по IP:{address}:{port}");
             InitClient();
-            serverInfo = (address, port, "ClausUmbrella");
+            
+            connectionInfoClientComponent.ServerInfo.Address = address;
+            connectionInfoClientComponent.ServerInfo.Port = port;
+
             State = NetWorkSystemState.Connect;
 
-            Connect(serverInfo.address, serverInfo.port, serverInfo.key);
+
+            var serverInfo = connectionInfoClientComponent.ServerInfo;
+            Connect(serverInfo.Address, serverInfo.Port, serverInfo.Key);
 
             while (State == NetWorkSystemState.Connect)
             {
-                currentAttempts++;
+                connectionInfoClientComponent.CurrentAttempts++;
                 
-                if (currentAttempts > MaxAttemtps)
+                if (connectionInfoClientComponent.CurrentAttempts > connectionInfoClientComponent.MaxAttemtps)
                 {
                     State = NetWorkSystemState.FailToConnect;
                     break;
@@ -241,7 +218,7 @@ namespace Systems
                 await Task.Delay(10);
             }
 
-            Debug.Log($"attempts: {currentAttempts}  state:{peer.ConnectionState} systemState: {State}");
+            Debug.Log($"attempts: {connectionInfoClientComponent.CurrentAttempts}  state:{peer.ConnectionState} systemState: {State}");
             return State != NetWorkSystemState.FailToConnect;
     
         }
@@ -253,7 +230,6 @@ namespace Systems
 
         public void LateStart()
         {
-
         }
     }
 }
@@ -263,6 +239,6 @@ namespace Systems
     public interface INetworkSystem : ISystem
     {
         bool IsReady { get; }
-        WorldNetworkSystem.NetWorkSystemState State { get; }
+        NetWorkSystemState State { get; }
     }
 }
