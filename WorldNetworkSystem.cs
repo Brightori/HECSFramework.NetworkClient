@@ -9,6 +9,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using UnityEditor;
 using UnityEngine;
 
 namespace Systems
@@ -36,6 +37,7 @@ namespace Systems
         private IDataProcessor dataProcessor = new HECSDataProcessor();
 
         public bool IsReady { get; private set; }
+        public Guid ClientGUID { get; private set; }
 
         private float nextConnectTime;
         private float intervalConnectTime = 5;
@@ -142,6 +144,10 @@ namespace Systems
 
         public void CommandGlobalReact(ClientConnectSuccessCommand command)
         {
+            State = NetWorkSystemState.BeforeSync;
+            connectionHolderComponent.serverPeer = peer;
+
+            ClientGUID = command.Guid;
             HECSDebug.Log($"Connected successfully to: <color=orange>{serverInfo.address}:{serverInfo.port}</color>.");
             EntityManager.GetSingleComponent<ServerInfoComponent>().ServerTickMs = command.ServerData.ServerTickIntervalMilliseconds;
             interval = new WaitForSeconds(command.ServerData.ServerTickIntervalMilliseconds / 1000f);
@@ -225,13 +231,6 @@ namespace Systems
             while (State == NetWorkSystemState.Connect)
             {
                 currentAttempts++;
-
-                if (peer.ConnectionState == ConnectionState.Connected)
-                {
-                    State = NetWorkSystemState.BeforeSync;
-                    connectionHolderComponent.serverPeer = peer;
-                    break;
-                }
                 
                 if (currentAttempts > MaxAttemtps)
                 {
@@ -244,6 +243,7 @@ namespace Systems
 
             Debug.Log($"attempts: {currentAttempts}  state:{peer.ConnectionState} systemState: {State}");
             return State != NetWorkSystemState.FailToConnect;
+    
         }
 
         public void UpdateLocal()
