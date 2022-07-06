@@ -86,13 +86,11 @@ namespace Systems
 
         private void ListenerOnPeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectinfo)
         {
-
-                EntityManager.Command(new CloseConnectionCommand());
+            EntityManager.Command(new CloseConnectionCommand());
 
             Debug.Log($"Disconnected. Reason: {disconnectinfo.Reason.ToString()}");
             EntityManager.GlobalCommand(new DisconnectedClientCommand { Reason = disconnectinfo.Reason });
         }
-
 
         public override void Dispose()
         {
@@ -113,8 +111,6 @@ namespace Systems
 
         public void CommandGlobalReact(ClientConnectSuccessCommand command)
         {
-           
-
             Debug.Log($"ClientConnectSuccess:{command.Guid}");
             ClientGUID = command.Guid;
           //  HECSDebug.Log($"Connected successfully to: <color=orange>{serverInfo.address}:{serverInfo.port}</color>.");
@@ -161,11 +157,7 @@ namespace Systems
 
             connectionInfoClientComponent.RoomWorldIndex = roomWorldIndex;
           
-          
             RegisterListener();
-            
-
-
 
             Debug.Log($"Подключаюсь к миру по IP:{address}:{port}");
             Connect(address, port, connectionInfoClientComponent.Key, 20);
