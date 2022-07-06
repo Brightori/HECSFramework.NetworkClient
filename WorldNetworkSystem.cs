@@ -86,13 +86,11 @@ namespace Systems
 
         private void ListenerOnPeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectinfo)
         {
-
-                EntityManager.Command(new CloseConnectionCommand());
+            EntityManager.Command(new CloseConnectionCommand());
 
             Debug.Log($"Disconnected. Reason: {disconnectinfo.Reason.ToString()}");
             EntityManager.GlobalCommand(new DisconnectedClientCommand { Reason = disconnectinfo.Reason });
         }
-
 
         public override void Dispose()
         {
@@ -159,11 +157,7 @@ namespace Systems
 
             connectionInfoClientComponent.RoomWorldIndex = roomWorldIndex;
           
-          
             RegisterListener();
-            
-
-
 
             Debug.Log($"Подключаюсь к миру по IP:{address}:{port}");
             networkClient.ConnectTo(address, port, connectionInfoClientComponent.Key, 20);
