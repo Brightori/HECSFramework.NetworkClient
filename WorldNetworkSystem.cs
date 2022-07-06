@@ -40,7 +40,7 @@ namespace Systems
         
         private IDataProcessor dataProcessor = new HECSDataProcessor();
 
-        public bool IsReady { get; private set; }
+
         public Guid ClientGUID { get; private set; }
 
         public override void InitSystem()
@@ -102,19 +102,17 @@ namespace Systems
             base.Dispose();
         }
 
-        private void Connect(string host, int port, string serverKey, int maxAttemtps)
-        {
-            networkClient.ConnectTo(host, port, serverKey, maxAttemtps);
-            IsReady = true;
-        }
+
 
         public void OnApplicationExit()
             => Dispose();
 
+        /// <summary>
+        /// Confirmation of successful connection to the server
+        /// </summary>
+        /// <param name="command"></param>
         public void CommandGlobalReact(ClientConnectSuccessCommand command)
         {
-           
-
             Debug.Log($"ClientConnectSuccess:{command.Guid}");
             ClientGUID = command.Guid;
           //  HECSDebug.Log($"Connected successfully to: <color=orange>{serverInfo.address}:{serverInfo.port}</color>.");
@@ -168,7 +166,7 @@ namespace Systems
 
 
             Debug.Log($"Подключаюсь к миру по IP:{address}:{port}");
-            Connect(address, port, connectionInfoClientComponent.Key, 20);
+            networkClient.ConnectTo(address, port, connectionInfoClientComponent.Key, 20);
 
             connectionInfoClientComponent.CurrentAttempts = 0;
             while (networkClient.State == NetWorkSystemState.Connect)
@@ -199,7 +197,6 @@ namespace Systems
             }
 
             return networkClient.State == NetWorkSystemState.Sync;
-            
         }
 
         public void UpdateLocal()
